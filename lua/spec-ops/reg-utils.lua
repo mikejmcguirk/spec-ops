@@ -36,67 +36,67 @@ local M = {}
 ---  in line with Neovim's defaults
 ---  If ctx.reg is the black hole, simply returns that value
 function M.base_handler(ctx)
-	ctx = ctx or {}
+    ctx = ctx or {}
 
-	local default_reg = utils.get_default_reg() --- @type string
-	local reg = (function()
-		if utils.is_valid_register(ctx.reg) then
-			return ctx.reg
-		else
-			return default_reg
-		end
-	end)() --- @type string
+    local default_reg = utils.get_default_reg() --- @type string
+    local reg = (function()
+        if utils.is_valid_register(ctx.reg) then
+            return ctx.reg
+        else
+            return default_reg
+        end
+    end)() --- @type string
 
-	ctx.op = ctx.op or "p"
-	if reg == "_" or ctx.op == "p" then
-		return { reg }
-	end
+    ctx.op = ctx.op or "p"
+    if reg == "_" or ctx.op == "p" then
+        return { reg }
+    end
 
-	ctx.lines = ctx.lines or { "" } -- Fallback should not trigger a ring movement on delete
+    ctx.lines = ctx.lines or { "" } -- Fallback should not trigger a ring movement on delete
 
-	local to_overwrite = { '"' }
-	if reg ~= '"' then
-		table.insert(to_overwrite, reg)
-	end
+    local to_overwrite = { '"' }
+    if reg ~= '"' then
+        table.insert(to_overwrite, reg)
+    end
 
-	if ctx.op == "d" and not ctx.vmode then
-		if #ctx.lines == 1 and reg ~= default_reg then
-			-- Known issue: When certain motions are used, the 1 register is written in addition
-			-- to the small delete register. That behavior is omitted
-			-- CORE: Would be useful to see the last omode text object/motion
-			return vim.tbl_extend("force", to_overwrite, { "-" })
-		else
-			-- NOTE: The possibility of the calling function erroring after this is run is
-			-- accepted in order to keep register behavior centralized
-			for i = 9, 2, -1 do
-				local old_reg = vim.fn.getreginfo(tostring(i - 1)) --- @type table
-				vim.fn.setreg(tostring(i), old_reg.regcontents, old_reg.regtype)
-			end
+    if ctx.op == "d" and not ctx.vmode then
+        if #ctx.lines == 1 and reg ~= default_reg then
+            -- Known issue: When certain motions are used, the 1 register is written in addition
+            -- to the small delete register. That behavior is omitted
+            -- CORE: Would be useful to see the last omode text object/motion
+            return vim.tbl_extend("force", to_overwrite, { "-" })
+        else
+            -- NOTE: The possibility of the calling function erroring after this is run is
+            -- accepted in order to keep register behavior centralized
+            for i = 9, 2, -1 do
+                local old_reg = vim.fn.getreginfo(tostring(i - 1)) --- @type table
+                vim.fn.setreg(tostring(i), old_reg.regcontents, old_reg.regtype)
+            end
 
-			table.insert(to_overwrite, "1")
-			return to_overwrite
-		end
-	end
+            table.insert(to_overwrite, "1")
+            return to_overwrite
+        end
+    end
 
-	if reg == default_reg then
-		table.insert(to_overwrite, "0")
-		return to_overwrite
-	else
-		return to_overwrite
-	end
+    if reg == default_reg then
+        table.insert(to_overwrite, "0")
+        return to_overwrite
+    else
+        return to_overwrite
+    end
 end
 
 --- @param ctx reg_handler_ctx
 --- @return string[]
 --- Validates ctx.reg, returning either it or a fallback to the default reg
 function M.target_only_handler(ctx)
-	ctx = ctx or {}
+    ctx = ctx or {}
 
-	if utils.is_valid_register(ctx.reg) then
-		return { ctx.reg }
-	else
-		return { utils.get_default_reg() }
-	end
+    if utils.is_valid_register(ctx.reg) then
+        return { ctx.reg }
+    else
+        return { utils.get_default_reg() }
+    end
 end
 
 --- @param ctx reg_handler_ctx
@@ -106,52 +106,52 @@ end
 --- If the op is paste (ctx.op = "p"), a numbered register is passed, or the black hole register
 --- is passed, only the input register will be returned and the history will not be incremented
 function M.ring_handler(ctx)
-	ctx = ctx or {}
+    ctx = ctx or {}
 
-	local reg = (function()
-		if utils.is_valid_register(ctx.reg) then
-			return ctx.reg
-		else
-			return utils.get_default_reg()
-		end
-	end)() --- @type string
+    local reg = (function()
+        if utils.is_valid_register(ctx.reg) then
+            return ctx.reg
+        else
+            return utils.get_default_reg()
+        end
+    end)() --- @type string
 
-	if reg == "_" or reg:match("^%d$") or ctx.op == "p" then
-		return { reg }
-	end
+    if reg == "_" or reg:match("^%d$") or ctx.op == "p" then
+        return { reg }
+    end
 
-	for i = 9, 1, -1 do
-		local old_reg = vim.fn.getreginfo(tostring(i - 1)) --- @type table
-		vim.fn.setreg(tostring(i), old_reg.regcontents, old_reg.regtype)
-	end
+    for i = 9, 1, -1 do
+        local old_reg = vim.fn.getreginfo(tostring(i - 1)) --- @type table
+        vim.fn.setreg(tostring(i), old_reg.regcontents, old_reg.regtype)
+    end
 
-	return { reg, "0" }
+    return { reg, "0" }
 end
 
 --- @param opt? string
 --- @return fun( ctx: reg_handler_ctx): string[]
 function M.get_handler(opt)
-	opt = opt or ""
+    opt = opt or ""
 
-	if opt == "target_only" then
-		return M.target_only_handler
-	elseif opt == "base" then
-		return M.base_handler
-	else
-		return M.ring_handler
-	end
+    if opt == "target_only" then
+        return M.target_only_handler
+    elseif opt == "base" then
+        return M.base_handler
+    else
+        return M.ring_handler
+    end
 end
 
 local function regtype_from_vtype(vtype)
-	local short_vtype = string.sub(vtype, 1, 1)
-	if short_vtype == "\22" then
-		local width = string.sub(vtype, 2, #vtype)
-		return "b" .. width
-	elseif short_vtype == "V" then
-		return "l"
-	else
-		return "c"
-	end
+    local short_vtype = string.sub(vtype, 1, 1)
+    if short_vtype == "\22" then
+        local width = string.sub(vtype, 2, #vtype)
+        return "b" .. width
+    elseif short_vtype == "V" then
+        return "l"
+    else
+        return "c"
+    end
 end
 
 -- TODO: Need to clamp paste returns to one here
@@ -162,35 +162,35 @@ end
 --- Edit op_state.reg_info in place
 --- An empty table will be set if the black hole register is passed in
 function M.get_reg_info(op_state)
-	-- NOTE: op_state.reg_info should be nil'd when a new vreg_pre is set
-	if op_state.reg_info then
-		return
-	end
+    -- NOTE: op_state.reg_info should be nil'd when a new vreg_pre is set
+    if op_state.reg_info then
+        return
+    end
 
-	-- TODO: Remove this. Right now though the other ops depend on the old method
-	local reg_handler_ctx = {
-		lines = op_state.lines,
-		op = op_state.op_type,
-		reg = op_state.vreg,
-		vmode = op_state.vmode,
-	}
-	local reges = op_state.reg_handler(reg_handler_ctx) --- @type string[]
-	local r = {} --- @type reg_info[]
+    -- TODO: Remove this. Right now though the other ops depend on the old method
+    local reg_handler_ctx = {
+        lines = op_state.lines,
+        op = op_state.op_type,
+        reg = op_state.vreg,
+        vmode = op_state.vmode,
+    }
+    local reges = op_state.reg_handler(reg_handler_ctx) --- @type string[]
+    local r = {} --- @type reg_info[]
 
-	if vim.tbl_contains(reges, "_") then
-		op_state.reg_info = {}
-	end
+    if vim.tbl_contains(reges, "_") then
+        op_state.reg_info = {}
+    end
 
-	for _, reg in pairs(reges) do
-		local reginfo = vim.fn.getreginfo(reg)
-		local lines = reginfo.regcontents or ""
-		local vtype = reginfo.regtype or "v"
-		local type = regtype_from_vtype(vtype)
+    for _, reg in pairs(reges) do
+        local reginfo = vim.fn.getreginfo(reg)
+        local lines = reginfo.regcontents or ""
+        local vtype = reginfo.regtype or "v"
+        local type = regtype_from_vtype(vtype)
 
-		table.insert(r, { reg = reg, lines = lines, type = type, vtype = vtype })
-	end
+        table.insert(r, { reg = reg, lines = lines, type = type, vtype = vtype })
+    end
 
-	op_state.reg_info = r
+    op_state.reg_info = r
 end
 
 --- @param op_state op_state
@@ -198,42 +198,42 @@ end
 --- This function assumes that, if the black hole register was specified, it will receive an
 --- empty op_state.reg_info table
 function M.set_reges(op_state)
-	local reg_info = op_state.reg_info or {} --- @type reg_info[]
-	if (not reg_info) or #reg_info < 1 then
-		return false
-	end
+    local reg_info = op_state.reg_info or {} --- @type reg_info[]
+    if (not reg_info) or #reg_info < 1 then
+        return false
+    end
 
-	local lines = op_state.lines or { "" }
-	local motion = op_state.motion or "char"
+    local lines = op_state.lines or { "" }
+    local motion = op_state.motion or "char"
 
-	local text = table.concat(lines, "\n") .. (motion == "line" and "\n" or "") --- @type string
-	local regtype = (function()
-		if motion == "block" then
-			return "b" .. blk_utils.get_block_reg_width(lines) or nil
-		elseif motion == "line" then
-			return "l"
-		else
-			return "c"
-		end
-	end)()
+    local text = table.concat(lines, "\n") .. (motion == "line" and "\n" or "") --- @type string
+    local regtype = (function()
+        if motion == "block" then
+            return "b" .. blk_utils.get_block_reg_width(lines) or nil
+        elseif motion == "line" then
+            return "l"
+        else
+            return "c"
+        end
+    end)()
 
-	for _, reg in pairs(reg_info) do
-		vim.fn.setreg(reg.reg, text, regtype)
-	end
+    for _, reg in pairs(reg_info) do
+        vim.fn.setreg(reg.reg, text, regtype)
+    end
 
-	-- TODO: op_state needs to contain a fire TextYankPost flag
-	vim.api.nvim_exec_autocmds("TextYankPost", {
-		buffer = vim.api.nvim_get_current_buf(),
-		data = {
-			inclusive = true,
-			operator = op_state.op_type,
-			regcontents = op_state.lines,
-			regname = op_state.vreg,
-			regtype = utils.regtype_from_motion(op_state.motion),
-			visual = op_state.vmode,
-		},
-	})
+    -- TODO: op_state needs to contain a fire TextYankPost flag
+    vim.api.nvim_exec_autocmds("TextYankPost", {
+        buffer = vim.api.nvim_get_current_buf(),
+        data = {
+            inclusive = true,
+            operator = op_state.op_type,
+            regcontents = op_state.lines,
+            regname = op_state.vreg,
+            regtype = utils.regtype_from_motion(op_state.motion),
+            visual = op_state.vmode,
+        },
+    })
 
-	return true
+    return true
 end
 return M
