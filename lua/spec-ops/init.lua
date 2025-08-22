@@ -79,7 +79,7 @@ local config = nil --- @type SpecOpsConfig
 -- if checking in here plays a part in that
 
 local function load()
-    --
+    M.setup({})
 end
 
 --- @param opts SpecOpsConfigOpts
