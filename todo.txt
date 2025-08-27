@@ -3,6 +3,7 @@ PROJECT WIDE
 ------------
 
 - For config, the issue is the individual operators
+- How are yanking and pasting to the expression register handled by default? Emulate
 - Address the one-shot normal mode from insert edge case. I think it only does +1 indexing if you go the end of the line, but check with g_ vs $. I think the fix is just to cap the end mark at the end of the line, but also have to look at multiple lines and multiple motions to see what is actually happening
 - Register bookkeeping
     - Maybe schedule_wrap register bookkeeping. But I'm not sure how that would affect mappings
@@ -78,6 +79,8 @@ PROJECT WIDE
 DOCUMENTATION
 -------------
 
+- The clipboard: STRING not available error is an upstream xclip issue. Use xsel instead
+    - I could, in theory, accept a PR that creates a sufficiently targeted solution, but I don't want to get into setting an alternative g:clipboard value or a weird hack to blanket hack to suppress clipboard errors. If someone has to use xclip, an alternative g:clipboard value to suppress those messages feels more like something for documentation than a built-in part of the plugin
 - What Neovim version(s) are required/supported
 - The README should be relatively full featured. Shouldn't really be necessary to look at the VimDoc IMO
 - No CoC
