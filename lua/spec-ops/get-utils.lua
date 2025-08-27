@@ -148,7 +148,7 @@ local function op_state_get_block_line(op_state, row_0, line, l_vcol, r_vcol)
     end
 
     local this_r_vcol = math.min(r_vcol, max_vcol)
-    this_r_vcol = op_state.curswant == vim.v.maxcol and max_vcol or this_r_vcol
+    this_r_vcol = op_state.view.curswant == vim.v.maxcol and max_vcol or this_r_vcol
     local r_l_vcol, r_r_vcol, r_err = blk_utils.vcols_from_vcol(line, this_r_vcol)
     if (not r_l_vcol) or not r_r_vcol or r_err then
         return nil, "get_block_line: " .. (r_err or "Unknown error in vcols_from_vcol")
