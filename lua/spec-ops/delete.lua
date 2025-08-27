@@ -2,6 +2,7 @@ local del_utils = require("spec-ops.del-utils")
 local get_utils = require("spec-ops.get-utils")
 local op_utils = require("spec-ops.op-utils")
 local reg_utils = require("spec-ops.reg-utils")
+local utils = require("spec-ops.utils")
 
 local M = {}
 
@@ -112,6 +113,10 @@ end
 --- @param motion string
 function M.delete_callback(motion)
     op_utils.set_op_state_cb(op_state, motion)
+    if not utils.check_modifiable(vim.api.nvim_get_current_buf()) then
+        return
+    end
+
     do_delete()
     op_utils.cleanup_op_state(op_state)
 end

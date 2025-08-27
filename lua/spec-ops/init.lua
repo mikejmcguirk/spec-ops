@@ -1,141 +1,41 @@
 local reg_utils = require("spec-ops.reg-utils")
 
---- @class GlobalConfig
---- @field reg_handler fun( ctx: reg_handler_ctx): string[]
-
---- @class GlobalConfigOpts
---- @field reg_handler nil|"default"|"target_only"|"ring"|fun( ctx: reg_handler_ctx): string[]
-
---- @class OpConfig
---- @field enabled boolean
---- @field setup_fun fun(opts: OpConfig)
---- @field reg_handler nil|fun( ctx: reg_handler_ctx): string[]
-
---- @class OpConfigOpts
---- @field enabled boolean|nil
---- @field reg_handler nil|"default"|"target_only"|"ring"|fun( ctx: reg_handler_ctx): string[]
-
---- @class OptsList
---- @field change OpConfig
---- @field delete OpConfig
---- @field paste OpConfig
---- @field substitute OpConfig
---- @field yank OpConfig
-
---- @class OptsListOpts
---- @field change OpConfigOpts|nil
---- @field delete OpConfigOpts|nil
---- @field paste OpConfigOpts|nil
---- @field substitute OpConfigOpts|nil
---- @field yank OpConfigOpts|nil
-
---- @class SpecOpsConfig
---- @field global GlobalConfig
---- @field operators OptsList
-
---- @class SpecOpsConfigOpts
---- @field global GlobalConfigOpts|nil
---- @field operators OptsListOpts|nil
+--- @alias SpecOpsRegHandlerOpt "default"|"target_only"|"ring"|fun( ctx: reg_handler_ctx): string[]
 
 local M = {}
 
---- @type SpecOpsConfig
-local defaults = {
-    global = {
-        reg_handler = reg_utils.get_handler(),
+local operators = {
+    change = {
+        setup_fun = require("spec-ops.change").setup,
     },
-    operators = {
-        change = {
-            enabled = true,
-            setup_fun = require("spec-ops.change").setup,
-            reg_handler = nil,
-        },
-        delete = {
-            enabled = true,
-            setup_fun = require("spec-ops.delete").setup,
-            reg_handler = nil,
-        },
-        paste = {
-            enabled = true,
-            setup_fun = require("spec-ops.paste").setup,
-            reg_handler = nil,
-        },
-        substitute = {
-            enabled = true,
-            setup_fun = require("spec-ops.substitute").setup,
-            reg_handler = nil,
-        },
-        yank = {
-            enabled = true,
-            setup_fun = require("spec-ops.yank").setup,
-            reg_handler = nil,
-        },
+    delete = {
+        setup_fun = require("spec-ops.delete").setup,
+    },
+    paste = {
+        setup_fun = require("spec-ops.paste").setup,
+    },
+    substitute = {
+        setup_fun = require("spec-ops.substitute").setup,
+    },
+    yank = {
+        setup_fun = require("spec-ops.yank").setup,
     },
 }
 
-local config = nil --- @type SpecOpsConfig
+function M.setup()
+    local g_spec_ops = vim.g.spec_ops or {}
+    local reg_handler = g_spec_ops.reg_handler or "ring" --- @type SpecOpsRegHandlerOpt
 
--- PERF: In my testing, spec-ops adds ~2ms to startup time. And I have to imagine that all the
--- if checking in here plays a part in that
-
-local function load()
-    M.setup({})
-end
-
---- @param opts SpecOpsConfigOpts
---- @return SpecOpsConfig
-function M.setup(opts)
-    opts = opts or {}
-
-    opts.global = opts.global or {}
-
-    opts.global.reg_handler = opts.global.reg_handler or "default"
-    local reg_handler_is_function = type(opts.global.reg_handler) == "function"
-    local reg_handler_is_string = type(opts.global.reg_handler) == "string"
-    if not (reg_handler_is_function or reg_handler_is_string) then
-        opts.global.reg_handler = "default"
+    if type(reg_handler) == "string" then
+        reg_handler = reg_utils.get_handler(reg_handler)
+    elseif type(reg_handler) ~= "function" then
+        reg_handler = reg_utils.get_handler("default")
     end
 
-    if type(opts.global.reg_handler) ~= "function" then
-        -- Already checked for nil and that the type is not a function
-        --- @diagnostic disable: param-type-mismatch
-        opts.global.reg_handler = reg_utils.get_handler(opts.global.reg_handler)
+    -- NOTE: Each operator should take the same config class
+    for _, o in pairs(operators) do
+        o.setup_fun({ reg_handler = reg_handler })
     end
-
-    opts.operators = opts.operators or {}
-    for _, v in pairs(opts.operators) do
-        if v.enabled == true or v.enabled == nil then
-            if v.reg_handler then
-                local op_reg_handler_is_fun = type(v.reg_handler) == "function"
-                local op_reg_handler_is_string = type(v.reg_handler) == "string"
-                if not (op_reg_handler_is_fun or op_reg_handler_is_string) then
-                    v.reg_handler = nil
-                end
-
-                if v.reg_handler and type(v.reg_handler) ~= "function" then
-                    v.reg_handler = reg_utils.get_handler(v.reg_handler)
-                end
-            end
-        end
-
-        if v.setup_fun then
-            v.setup_fun = nil
-        end
-    end
-
-    config = vim.tbl_deep_extend("force", defaults, opts)
-
-    for _, o in pairs(config.operators) do
-        if o.enabled then
-            if not o.reg_handler then
-                o.reg_handler = config.global.reg_handler
-            end
-
-            o.setup_fun(o)
-        end
-    end
-
-    return config
 end
 
 return M

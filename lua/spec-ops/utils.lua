@@ -1,5 +1,17 @@
 local M = {}
 
+---@param bufnr? integer
+---@return boolean
+function M.check_modifiable(bufnr)
+    if vim.api.nvim_get_option_value("modifiable", { buf = bufnr or 0 }) then
+        return true
+    else
+        local err_msg = "E21: Cannot make changes, 'modifiable' is off" ---@type string
+        vim.api.nvim_echo({ { err_msg } }, true, { err = true })
+        return false
+    end
+end
+
 --- @class op_marks
 --- @field start {row: integer, col: integer}
 --- @field fin {row: integer, col: integer}

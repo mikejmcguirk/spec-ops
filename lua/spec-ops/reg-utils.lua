@@ -89,6 +89,7 @@ end
 --- @param ctx reg_handler_ctx
 --- @return string[]
 --- Validates ctx.reg, returning either it or a fallback to the default reg
+--- TODO: Does not quite work, because unnamed is still pointend at zero
 function M.target_only_handler(ctx)
     ctx = ctx or {}
 
@@ -167,13 +168,14 @@ function M.get_reg_info(op_state)
         return
     end
 
-    -- TODO: Remove this. Right now though the other ops depend on the old method
+    -- Separate ctx since this is meant to be extensible
     local reg_handler_ctx = {
         lines = op_state.lines,
         op = op_state.op_type,
         reg = op_state.vreg,
         vmode = op_state.vmode,
     }
+
     local reges = op_state.reg_handler(reg_handler_ctx) --- @type string[]
     local r = {} --- @type reg_info[]
 
@@ -181,6 +183,8 @@ function M.get_reg_info(op_state)
         op_state.reg_info = {}
     end
 
+    -- TODO: Lines should be its own key, then have the different reges
+    -- No need to store lines in multiple
     for _, reg in pairs(reges) do
         local reginfo = vim.fn.getreginfo(reg)
         local lines = reginfo.regcontents or ""

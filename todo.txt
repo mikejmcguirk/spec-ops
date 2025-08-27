@@ -2,7 +2,8 @@
 PROJECT WIDE
 ------------
 
-- Unsure what to do about automatic lazy loading. Hard to do at all because I'm not sure how we can do a plugin folder, and there's also the reality that, as is, most people use Lazy and lazy handles Lazy loading, so having the plugin do it risks a conflict
+- For config, the issue is the individual operators
+- Address the one-shot normal mode from insert edge case. I think it only does +1 indexing if you go the end of the line, but check with g_ vs $. I think the fix is just to cap the end mark at the end of the line, but also have to look at multiple lines and multiple motions to see what is actually happening
 - Register bookkeeping
     - Maybe schedule_wrap register bookkeeping. But I'm not sure how that would affect mappings
 - Add [y and ]y ring cycling

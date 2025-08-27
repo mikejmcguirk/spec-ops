@@ -2,6 +2,7 @@ local change_utils = require("spec-ops.change-utils")
 local get_utils = require("spec-ops.get-utils")
 local op_utils = require("spec-ops.op-utils")
 local reg_utils = require("spec-ops.reg-utils")
+local utils = require("spec-ops.utils")
 
 local M = {}
 
@@ -192,7 +193,7 @@ local function do_change()
         -- Assuming that more non-keywords want to insert before than after
         -- MAYBE: Could add "_" for users that remove it. But I'd prefer to add exceptions based on
         -- default behavior or real-world use-cases
-        elseif vim.tbl_contains({ ".", " " }, start_char_post) then
+        elseif vim.tbl_contains({ ".", " ", "-" }, start_char_post) then
             return true
         else
             return false
@@ -226,6 +227,10 @@ end
 --- @param motion string
 function M.change_callback(motion)
     op_utils.set_op_state_cb(op_state, motion)
+    if not utils.check_modifiable(vim.api.nvim_get_current_buf()) then
+        return
+    end
+
     do_change()
     op_utils.cleanup_op_state(op_state)
 end

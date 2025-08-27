@@ -2,6 +2,16 @@
 -- not available message. Also have to use or statements because the regdata is vacant
 -- The or statements could be better handled, but are a minor problem. The STRING error is not
 
+-- TODO: If I block yank the colors, 2 and 5 miss chars past the _
+-- vim.g.terminal_color_0 = c.black
+-- vim.g.terminal_color_1 = c.red
+-- vim.g.terminal_color_2 = c.light_purple
+-- vim.g.terminal_color_3 = c.orange
+-- vim.g.terminal_color_4 = c.cyan
+-- vim.g.terminal_color_5 = c.light_green
+-- vim.g.terminal_color_6 = c.yellow
+-- vim.g.terminal_color_7 = c.fg
+
 local get_utils = require("spec-ops.get-utils")
 local op_utils = require("spec-ops.op-utils")
 local reg_utils = require("spec-ops.reg-utils")
