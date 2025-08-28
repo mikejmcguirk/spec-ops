@@ -25,7 +25,7 @@ local function get_chars(marks)
     return vim.api.nvim_buf_get_text(0, start_row - 1, start_col, fin_row - 1, fin_byte, {})
 end
 
----@param op_state op_state
+---@param op_state OpState
 ---@return string[]|nil, string|nil
 --- This function assumes that start_row <= fin_row is already verified
 local function op_state_get_chars(op_state)
@@ -58,7 +58,7 @@ local function get_lines(marks)
     return vim.api.nvim_buf_get_text(0, start_row - 1, 0, fin_row - 1, #fin_line, {}), nil
 end
 
----@param op_state op_state
+---@param op_state OpState
 ---@return string[]|nil, string|nil
 --- This function assumes that start_row <= fin_row is already verified
 local function op_state_get_lines(op_state)
@@ -119,7 +119,7 @@ local function get_block_line(row_0, line, l_vcol, r_vcol, max_curswant)
     return string.rep(" ", this_l_vcol - l_vcol) .. text
 end
 
--- TODO: Right now this is actually asking like "zy" because we don't add extra space up to the
+-- TODO: Right now this is actually acting like "zy" because we don't add extra space up to the
 -- block width. I'm... actually fine with that being default behavior, but nonetheless we should
 -- emulate Nvim accurately
 -- Since we now have the op_state variable, what we would do is pass the ctx value down with it
@@ -200,7 +200,7 @@ local function get_block(marks, curswant)
     return block_lines, nil
 end
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return string[]|nil, string|nil
 --- This function assumes that the marks are already sorted so the start mark is on the
 --- first row
@@ -244,7 +244,7 @@ function M.do_get(opts)
 end
 
 -- TODO: Obviously rename this when done
---- @param op_state op_state
+--- @param op_state OpState
 --- @return boolean|nil, nil|string
 function M.do_state_get(op_state)
     if not op_state.marks then
@@ -277,7 +277,6 @@ function M.do_state_get(op_state)
         return nil, "do_get: " .. (err or "Unknown error in sub-function")
     end
 
-    -- TODO: Unsure of how to handle the typing here
     op_state.lines = lines
     op_state.marks_post = op_state.marks
     return true, nil

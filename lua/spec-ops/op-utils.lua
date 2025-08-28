@@ -3,16 +3,16 @@ local utils = require("spec-ops.utils")
 
 local M = {}
 
--- TODO: This should be flatter. Use "pre" for anything done in the operator, then post for
--- anything after the change/yank happens
 -- TODO: Rather than append post lines and post marks directly, there should be an op_data
 -- sub-table that is added on. Preserves the idea of the ops having their own return data
 -- but composes the state into the main state table
 -- Store register in op_state since vim.v.register is clobbered by some text objects
 -- NOTE: A lot of the "pre" values are to handle the case where you enter an operator then
 -- cancel operator pending mode. By not over-writing the non-pre state, dot-repeats still work
+-- TODO: OpState should be in its own file so it's clear that all the state management is
+-- happening here
 
---- @class op_state
+--- @class OpState
 --- @field fin_line_pre string
 --- @field fin_line_post string
 --- @field hl_group string
@@ -23,12 +23,13 @@ local M = {}
 --- @field marks_post op_marks
 --- @field motion string
 --- @field op_type "y"|"c"|"p"|"d"
---- @field reg_handler fun( ctx: reg_handler_ctx): string[]
---- @field reg_info reg_info[]
+--- @field reg_handler fun( ctx: RegHandlerCtx): string[]
+--- @field reginfo SpecOpsRegInfo[]
 --- @field start_line_pre string
 --- @field start_line_post string
 --- @field view_pre vim.fn.winsaveview.ret
 --- @field view vim.fn.winsaveview.ret
+--- @field vcount integer
 --- @field vmode_pre boolean
 --- @field vmode boolean
 --- @field vreg_pre string|nil
@@ -40,10 +41,12 @@ local M = {}
 -- should, though we should have whatever fallback behavior we can
 -- This will be useful for making more explicit what parts of the opts table "seed" it vs.
 -- which ones are determined as the process is run
+-- TODO: Check for any other instances of op_type that include "c". AFAIK there is no reason for
+-- it to be separate from delete
 
---- @param reg_handler fun( ctx: reg_handler_ctx): string[]
+--- @param reg_handler fun( ctx: RegHandlerCtx): string[]
 --- @param op_type "y"|"c"|"p"|"d"
---- @return op_state
+--- @return OpState
 function M.get_new_op_state(hl_group, hl_ns, hl_timeout, reg_handler, op_type)
     return {
         hl_group = hl_group or nil,
@@ -65,7 +68,7 @@ end
 -- Pull start and fin lines immediately and check cols for overages
 -- get_marks needs to take op_state so that the lines gotten there can be appended to the table
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return nil
 --- Modifies op_state in place
 function M.set_op_state_cb(op_state, motion)
@@ -110,13 +113,15 @@ function M.set_op_state_cb(op_state, motion)
 
     op_state.view_pre = nil
 
+    op_state.vcount = vim.v.count1
+
     -- NOTE: This will be validated later in reg handler
     op_state.vreg = op_state.vreg_pre or utils.get_default_reg()
-    op_state.reg_info = nil
+    op_state.reginfo = nil
     op_state.vreg_pre = nil
 end
 
---- @param op_state op_state
+--- @param op_state OpState
 function M.cleanup_op_state(op_state)
     op_state.fin_line_pre = nil
     op_state.fin_line_post = nil
@@ -142,7 +147,7 @@ local function is_vmode()
     end
 end
 
---- @param op_state op_state
+--- @param op_state OpState
 function M.set_op_state_pre(op_state)
     op_state.view_pre = vim.fn.winsaveview()
     op_state.vreg_pre = vim.v.register
@@ -188,6 +193,41 @@ function M.setup_text_lines(opts)
     end
 
     return lines
+end
+
+--- @param op_state OpState
+function M.op_state_apply_count(op_state)
+    op_state = op_state or {}
+    op_state.reginfo = op_state.reginfo or {}
+    op_state.motion = op_state.motion or "char"
+    op_state.vcount = op_state.vcount or 1
+
+    for _, r in pairs(op_state.reginfo) do
+        -- TODO: Add short circuiting logic
+        r.text = r.text or ""
+        local vtype = (r.vtype or "v"):sub(1, 1)
+        local is_linewise = vtype == "V" or op_state.motion == "line"
+
+        if vtype == "v" and op_state.vcount > 1 and not is_linewise then
+            r.text = string.rep(r.text, op_state.vcount)
+        end
+
+        local lines = vim.split(r.text:gsub("\n$", ""), "\n") ---@type string[]
+
+        if is_linewise and op_state.vcount > 1 then
+            local ext_count = op_state.vcount - 1
+            local orig_lines = vim.deepcopy(lines, true)
+            for _ = 1, ext_count do
+                vim.list_extend(lines, orig_lines)
+            end
+        elseif vtype == "\22" and op_state.vcount > 1 and not is_linewise then
+            for i, l in ipairs(lines) do
+                lines[i] = string.rep(l, op_state.vcount)
+            end
+        end
+
+        r.lines = lines
+    end
 end
 
 --- @param marks op_marks

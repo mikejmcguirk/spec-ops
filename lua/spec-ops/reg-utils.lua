@@ -8,17 +8,20 @@ local utils = require("spec-ops.utils")
 
 local M = {}
 
---- @class reg_handler_ctx
+--- @class RegHandlerCtx
 --- @field lines? string[]
 --- @field op string "y"|"p"|"d"
 --- @field reg string
 --- @field vmode boolean
 
---- @class reg_info
+--- @class SpecOpsRegInfo
+--- @field lines? string[]
 --- @field reg string
---- @field lines string[]
+--- @field text string
 --- @field type string
 --- @field vtype string
+
+--- @alias RegHandlerStrs "target_only"|"base"|"ring"
 
 -- TODO: Weird question - Do we handle reg validity here or in the ops? If you do it here, anyone
 -- who wants to make a custom handler has to do it themselves. But if you don't, then you're
@@ -28,11 +31,14 @@ local M = {}
 -- Same with inlining the delete_cmds table instead of storing it persistently
 -- Same with creating locals for every part of ctx
 
---- @param ctx reg_handler_ctx
+-- PERF: Right now I'm trying to cover the 'if op_type == "p" then only return vreg' case as
+-- thoroughly as possible. But this checking is redundant and should be pared back
+
+--- @param ctx RegHandlerCtx
 --- @return string[]
 ---  See :h registers
 ---  If ctx.op is "p", will return ctx.reg or a fallback
----  For op values of "y", "c", and "d", will calculate a combination of registers to write to
+---  For op values of "y" or "d", will calculate a combination of registers to write to
 ---  in line with Neovim's defaults
 ---  If ctx.reg is the black hole, simply returns that value
 function M.base_handler(ctx)
@@ -54,9 +60,9 @@ function M.base_handler(ctx)
 
     ctx.lines = ctx.lines or { "" } -- Fallback should not trigger a ring movement on delete
 
-    local to_overwrite = { '"' }
+    local reges = { '"' }
     if reg ~= '"' then
-        table.insert(to_overwrite, reg)
+        table.insert(reges, reg)
     end
 
     if ctx.op == "d" and not ctx.vmode then
@@ -64,7 +70,7 @@ function M.base_handler(ctx)
             -- Known issue: When certain motions are used, the 1 register is written in addition
             -- to the small delete register. That behavior is omitted
             -- CORE: Would be useful to see the last omode text object/motion
-            return vim.tbl_extend("force", to_overwrite, { "-" })
+            return vim.tbl_extend("force", reges, { "-" })
         else
             -- NOTE: The possibility of the calling function erroring after this is run is
             -- accepted in order to keep register behavior centralized
@@ -73,20 +79,20 @@ function M.base_handler(ctx)
                 vim.fn.setreg(tostring(i), old_reg.regcontents, old_reg.regtype)
             end
 
-            table.insert(to_overwrite, "1")
-            return to_overwrite
+            table.insert(reges, "1")
+            return reges
         end
     end
 
     if reg == default_reg then
-        table.insert(to_overwrite, "0")
-        return to_overwrite
+        table.insert(reges, "0")
+        return reges
     else
-        return to_overwrite
+        return reges
     end
 end
 
---- @param ctx reg_handler_ctx
+--- @param ctx RegHandlerCtx
 --- @return string[]
 --- Validates ctx.reg, returning either it or a fallback to the default reg
 --- TODO: Does not quite work, because unnamed is still pointend at zero
@@ -100,7 +106,7 @@ function M.target_only_handler(ctx)
     end
 end
 
---- @param ctx reg_handler_ctx
+--- @param ctx RegHandlerCtx
 --- @return string[]
 --- If yanking, changing, or deleting (ctx.op "y", "c", or "d"), write a copy to reg 0,
 --- incrementing the other numbered registers to store history
@@ -129,14 +135,14 @@ function M.ring_handler(ctx)
     return { reg, "0" }
 end
 
---- @param opt? string
---- @return fun( ctx: reg_handler_ctx): string[]
-function M.get_handler(opt)
-    opt = opt or ""
+--- @param handler_str? RegHandlerStrs
+--- @return fun( ctx: RegHandlerCtx): string[]
+function M.get_handler(handler_str)
+    handler_str = handler_str or "ring"
 
-    if opt == "target_only" then
+    if handler_str == "target_only" then
         return M.target_only_handler
-    elseif opt == "base" then
+    elseif handler_str == "base" then
         return M.base_handler
     else
         return M.ring_handler
@@ -158,51 +164,78 @@ end
 -- TODO: Need to clamp paste returns to one here
 -- TODO: If we do it this way, try to stay out of doing it as text entirely
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return nil
 --- Edit op_state.reg_info in place
 --- An empty table will be set if the black hole register is passed in
-function M.get_reg_info(op_state)
+function M.get_reginfo(op_state)
+    op_state = op_state or {}
     -- NOTE: op_state.reg_info should be nil'd when a new vreg_pre is set
-    if op_state.reg_info then
+    if op_state.reginfo then
         return
     end
 
-    -- Separate ctx since this is meant to be extensible
     local reg_handler_ctx = {
         lines = op_state.lines,
         op = op_state.op_type,
         reg = op_state.vreg,
         vmode = op_state.vmode,
-    }
+    } --- @type RegHandlerCtx
 
-    local reges = op_state.reg_handler(reg_handler_ctx) --- @type string[]
-    local r = {} --- @type reg_info[]
+    local reges = (function()
+        if op_state.op_type == "p" then
+            return M.target_only_handler(reg_handler_ctx)
+        else
+            return op_state.reg_handler(reg_handler_ctx)
+        end
+    end)() --- @type string[]
+
+    local r = {} --- @type SpecOpsRegInfo[]
 
     if vim.tbl_contains(reges, "_") then
-        op_state.reg_info = {}
+        op_state.reginfo = {}
+        return
     end
 
-    -- TODO: Lines should be its own key, then have the different reges
-    -- No need to store lines in multiple
+    -- TODO: Put both lines and text in here, then let the repeat function use the data it wants
+    -- TODO: Imply regtype based on trailing \n when necessary
+    -- PERF: Adding both lines and text is cumbersome
     for _, reg in pairs(reges) do
         local reginfo = vim.fn.getreginfo(reg)
-        local lines = reginfo.regcontents or ""
+        local text = vim.fn.getreg(reg) or ""
         local vtype = reginfo.regtype or "v"
         local type = regtype_from_vtype(vtype)
 
-        table.insert(r, { reg = reg, lines = lines, type = type, vtype = vtype })
+        table.insert(r, { reg = reg, text = text, type = type, vtype = vtype })
     end
 
-    op_state.reg_info = r
+    op_state.reginfo = r
 end
 
---- @param op_state op_state
+-- MAYBE: You could scan the lines to check them against some condition, but that would potentially
+-- cause more performance lag then occasionally letting a "bad" paste through, whatever that means
+-- Potential user hook
+
+--- @param op_state OpState
+--- @return boolean
+function M.can_set_reginfo(op_state)
+    if #op_state.reginfo < 1 then
+        return false --- Black hole register
+    end
+
+    if not op_state.reginfo[1].text or #op_state.reginfo[1].text < 1 then
+        return false
+    end
+
+    return true
+end
+
+--- @param op_state OpState
 --- @return boolean
 --- This function assumes that, if the black hole register was specified, it will receive an
 --- empty op_state.reg_info table
 function M.set_reges(op_state)
-    local reg_info = op_state.reg_info or {} --- @type reg_info[]
+    local reg_info = op_state.reginfo or {} --- @type SpecOpsRegInfo[]
     if (not reg_info) or #reg_info < 1 then
         return false
     end

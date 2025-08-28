@@ -1,3 +1,5 @@
+-- NOTE: A set of row, col, row, col inserts before the col
+
 local blk_utils = require("spec-ops.block-utils")
 local op_utils = require("spec-ops.op-utils")
 
@@ -177,6 +179,11 @@ function M.adj_paste_cursor_default(opts)
     else
         vim.api.nvim_win_set_cursor(0, { opts.marks.fin.row, opts.marks.fin.col })
     end
+end
+
+--- @param op_state OpState
+function M.op_state_paste(op_state)
+    op_state = op_state or {}
 end
 
 return M

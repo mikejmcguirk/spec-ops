@@ -3,6 +3,7 @@ PROJECT WIDE
 ------------
 
 - For config, the issue is the individual operators
+- Have a config option to set default keymaps that defaults to true. Document the plug maps.
 - How are yanking and pasting to the expression register handled by default? Emulate
 - Address the one-shot normal mode from insert edge case. I think it only does +1 indexing if you go the end of the line, but check with g_ vs $. I think the fix is just to cap the end mark at the end of the line, but also have to look at multiple lines and multiple motions to see what is actually happening
 - Register bookkeeping
@@ -75,10 +76,19 @@ PROJECT WIDE
     - Ideally, I would have a dir synced to the current master version, a dev instance, and then could make other folders for pull requests
     - Also need to consider - Which version do I use? Prefer it be local
 
+=====
+MAYBE
+=====
+
+- Store operator flags in op_state
+- Store OpConfig info in each Op module. Problem is it creates a separate data structure from
+op_state
+
 -------------
 DOCUMENTATION
 -------------
 
+- Note that virtual edit is not supported
 - The clipboard: STRING not available error is an upstream xclip issue. Use xsel instead
     - I could, in theory, accept a PR that creates a sufficiently targeted solution, but I don't want to get into setting an alternative g:clipboard value or a weird hack to blanket hack to suppress clipboard errors. If someone has to use xclip, an alternative g:clipboard value to suppress those messages feels more like something for documentation than a built-in part of the plugin
 - What Neovim version(s) are required/supported

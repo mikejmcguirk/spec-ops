@@ -39,7 +39,7 @@ end
 
 -- TODO: It looks like hl.range uses vim._with to get vi_curswant
 
---- @param  op_state op_state
+--- @param  op_state OpState
 --- @return nil
 --- Becaus this function is scheduled, op_state might be cleared before it's run. Copy the
 --- relevant values now so we know they're available later

@@ -7,7 +7,7 @@ local M = {}
 
 local is_yanking = false --- @type boolean
 local ofunc = "v:lua.require'spec-ops.yank'.yank_callback"
-local op_state = nil --- @type op_state
+local op_state = nil --- @type OpState
 
 -- TODO: cw/cW behavior would actually work here. Do in Substitute first though so we can see how
 -- the generalization builds out. Needs to be a configurable flag on setup
@@ -34,7 +34,7 @@ end
 function M.setup(opts)
     opts = opts or {}
 
-    local reg_handler = opts.reg_handler or reg_utils.get_handler()
+    local reg_handler = reg_utils.get_handler("target_only")
 
     local hl_group = "SpecOpsYank" --- @type string
     vim.api.nvim_set_hl(0, hl_group, { link = "IncSearch", default = true })
@@ -43,14 +43,6 @@ function M.setup(opts)
 
     op_state = op_utils.get_new_op_state(hl_group, hl_ns, hl_timeout, reg_handler, "y")
 
-    -- TODO: It feels like the flag could be stored in op_state, as you need a generalized
-    -- way to be able to call linewise ops. Though paste is an uncomfortable exception. You could
-    -- then use a closure to make sure the autocmd can update the flag
-    -- For the paste case, just make sure the option exists to not create the flag
-    -- You can then specify the group name in the setup. One issue here though is, this does
-    -- make the flag public, which it really should not be. This probably points then to
-    -- making a generalizable internal op state. But since we don't have data passing issues there,
-    -- that should wait a while
     vim.api.nvim_create_autocmd("ModeChanged", {
         group = vim.api.nvim_create_augroup("spec-ops_yank-flag", { clear = true }),
         pattern = "no*",
@@ -121,10 +113,11 @@ local function do_yank()
 
     local ok, err = get_utils.do_state_get(op_state) --- @type boolean|nil, nil|string
     if (not ok) or err then
-        return vim.notify(err or "Unknown error in do_get", vim.log.levels.ERROR)
+        vim.notify(err or "Unknown error in do_get", vim.log.levels.ERROR)
+        return
     end
 
-    reg_utils.get_reg_info(op_state)
+    reg_utils.get_reginfo(op_state)
     if not reg_utils.set_reges(op_state) then
         return
     end

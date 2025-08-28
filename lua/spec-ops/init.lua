@@ -1,6 +1,6 @@
 local reg_utils = require("spec-ops.reg-utils")
 
---- @alias SpecOpsRegHandlerOpt "default"|"target_only"|"ring"|fun( ctx: reg_handler_ctx): string[]
+--- @alias SpecOpsRegHandlerOpt "default"|"target_only"|"ring"|fun( ctx: RegHandlerCtx): string[]
 
 --- @class (exact) SpecOpsGlobalConfig
 --- @field reg_handler? SpecOpsRegHandlerOpt
@@ -21,7 +21,6 @@ local reg_utils = require("spec-ops.reg-utils")
 
 local M = {}
 
--- TODO: Each op should store its own config in an OpConfig table and be able to report its config
 -- TODO: Make sure that re-initialization is possible
 
 local ops = {
@@ -43,7 +42,7 @@ local ops = {
 }
 
 --- @param reg_handler SpecOpsRegHandlerOpt
---- @return fun( ctx: reg_handler_ctx): string[]
+--- @return fun( ctx: RegHandlerCtx): string[]
 local function validate_reg_hander(reg_handler)
     if type(reg_handler) == "function" then
         return reg_handler

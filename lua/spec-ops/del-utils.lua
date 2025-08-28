@@ -4,7 +4,7 @@ local M = {}
 
 -- TODO: This can probably be re-generalized, but working through everything first
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return string|nil
 --- This function assumes that start_row <= fin_row is already verified
 local function op_state_del_chars(op_state)
@@ -36,7 +36,7 @@ local function op_state_del_chars(op_state)
     return nil
 end
 
----@param op_state op_state
+---@param op_state OpState
 ---@return nil|string
 --- This function assumes that start_row <= fin_row is already verified
 local function del_lines(op_state)
@@ -70,7 +70,7 @@ end
 -- TODO: Don't consolidate the set/delete/paste op making logic. It's just too confusing
 -- And really, even the pastes might need to be broken up
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @param line string
 --- @param l_vcol integer
 --- @param r_vcol integer
@@ -133,7 +133,7 @@ end
 -- the marks_after are tied to the op_state anyway
 -- TODO: Need to think through edge cases here related to zero lines. Major ones seem sorted out
 -- but others remain I'm sure
---- @param op_state op_state
+--- @param op_state OpState
 --- @param del_info block_op_info[]
 --- @return nil|string
 local function do_block_del_ops(op_state, del_info)
@@ -197,7 +197,7 @@ local function do_block_del_ops(op_state, del_info)
 end
 
 -- TODO: Can certainly be re-generalized, but trying to get the logic specific
----@param op_state op_state
+---@param op_state OpState
 ---@return nil|string
 --- This function assumes that the marks are already sorted so the start mark is on the
 --- first row
@@ -232,7 +232,7 @@ end
 
 -- TODO: needs to be ok, err pattern
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return string|nil
 function M.do_del(op_state)
     if not op_state.marks then

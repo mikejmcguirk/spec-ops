@@ -12,6 +12,8 @@ function M.check_modifiable(bufnr)
     end
 end
 
+--- PERF: Change to a list of four integers
+
 --- @class op_marks
 --- @field start {row: integer, col: integer}
 --- @field fin {row: integer, col: integer}

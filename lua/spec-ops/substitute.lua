@@ -11,8 +11,8 @@ vim.api.nvim_set_hl(0, hl_group, { link = "DiagnosticWarn", default = true })
 local hl_ns = vim.api.nvim_create_namespace("spec-ops.substitute-highlight") --- @type integer
 local hl_timer = 175 --- @type integer
 
-local reg_handler = nil ---@type fun( ctx: reg_handler_ctx): string[]
-local op_state = op_utils.get_new_op_state() --- @type op_state
+local reg_handler = nil ---@type fun( ctx: RegHandlerCtx): string[]
+local op_state = op_utils.get_new_op_state() --- @type OpState
 
 local is_substituting = false --- @type boolean
 local is_after = true --- @type boolean

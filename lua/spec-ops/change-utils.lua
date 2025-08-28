@@ -2,7 +2,7 @@ local blk_utils = require("spec-ops.block-utils")
 
 local M = {}
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return boolean|nil, string|nil
 --- Modifies op_state in place
 --- Assumes that start_row <= fin_row is already verified
@@ -55,7 +55,7 @@ local function chg_chars(op_state)
     return true, nil
 end
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return boolean|nil, string|nil
 --- Modifies op_state in place
 --- Assumes that start_row <= fin_row is already verified
@@ -76,7 +76,7 @@ local function chg_lines(op_state)
     return true, nil
 end
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @param line string
 --- @param l_vcol integer
 --- @param r_vcol integer
@@ -145,7 +145,7 @@ end
 -- the marks_after are tied to the op_state anyway
 -- TODO: Need to think through edge cases here related to zero lines. Major ones seem sorted out
 -- but others remain I'm sure
---- @param op_state op_state
+--- @param op_state OpState
 --- @param chg_info block_op_info[]
 --- @return boolean|nil, nil|string
 local function do_block_chg_ops(op_state, chg_info)
@@ -236,7 +236,7 @@ local function do_block_chg_ops(op_state, chg_info)
 end
 
 -- TODO: Can certainly be re-generalized, but trying to get the logic specific
----@param op_state op_state
+---@param op_state OpState
 ---@return boolean|nil, nil|string
 --- This function assumes that the marks are already sorted so the start mark is on the first row
 --- This function assumes that start_row <= fin_row is already verified
@@ -280,7 +280,7 @@ end
 -- much less ergonomic to work with. Especially in this case, where we are editing op_state
 -- in place but then we have to return an error value for checking.
 
---- @param op_state op_state
+--- @param op_state OpState
 --- @return boolean|nil, nil|string
 function M.do_change(op_state)
     if not op_state.marks then

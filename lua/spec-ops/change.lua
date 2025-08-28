@@ -6,7 +6,7 @@ local utils = require("spec-ops.utils")
 
 local M = {}
 
-local op_state = nil --- @type op_state
+local op_state = nil --- @type OpState
 local is_changing = false --- @type boolean
 local ofunc = "v:lua.require'spec-ops.change'.change_callback" --- @type string
 
@@ -43,9 +43,11 @@ function M.setup(opts)
         end,
     })
 
-    -- TODO: Still existing problem case: Because is_changing is not set on dot-repeat, the
-    -- special case logic does not trigger when the motion is re-run. This is acceptable for now
-    -- while I'm still working through the state management
+    -- TODO: Dot-repeat stores the output of the last expr, but doesn't re-calculate if it's still
+    -- correct. One thing is that, if we use one of our bespoke word motions, state needs to be
+    -- left behind so we know that it happened. Another idea, and this might be a useful hack
+    -- in general, is that the end of the change function should set the ofunc to a separate
+    -- callback func. This should avoid issues with omode cancels as well
     -- TODO: When moving this into substitute, just copy the logic over. Should just work. Make
     -- sure the dot-repeat issue is fixed. Then create an individualized version for yank with
     -- an option, then create the abstraction for all three
@@ -165,7 +167,7 @@ local function do_change()
     vim.api.nvim_win_set_cursor(0, { marks_post.start.row, marks_post.start.col })
 
     if should_yank(op_state.lines) then
-        reg_utils.get_reg_info(op_state)
+        reg_utils.get_reginfo(op_state)
         reg_utils.set_reges(op_state)
     end
 

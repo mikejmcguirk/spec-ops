@@ -6,7 +6,7 @@ local utils = require("spec-ops.utils")
 
 local M = {}
 
-local op_state = nil --- @type op_state
+local op_state = nil --- @type OpState
 local is_deleting = false --- @type boolean
 local ofunc = "v:lua.require'spec-ops.delete'.delete_callback" --- @type string
 
@@ -106,7 +106,7 @@ local function do_delete()
         return
     end
 
-    reg_utils.get_reg_info(op_state)
+    reg_utils.get_reginfo(op_state)
     reg_utils.set_reges(op_state)
 end
 

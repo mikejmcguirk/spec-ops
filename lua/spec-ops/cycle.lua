@@ -1,6 +1,8 @@
 -- autocmd to know if we have incremented
 -- TODO: Do we add the ability to change motions?
 
+-- TODO: Update this so it works based on op_state
+
 local op_utils = require("spec-ops.op-utils")
 local paste_utils = require("spec-ops.paste-utils")
 local set_utils = require("spec-ops.set-utils")

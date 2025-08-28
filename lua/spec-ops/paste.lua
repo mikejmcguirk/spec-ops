@@ -13,10 +13,9 @@ local M = {}
 local hl_group = "SpecOpsPaste" --- @type string
 vim.api.nvim_set_hl(0, hl_group, { link = "Boolean", default = true })
 local hl_ns = vim.api.nvim_create_namespace("spec-ops.paste-highlight") --- @type integer
-local hl_timer = 175 --- @type integer
+local hl_timeout = 175 --- @type integer
 
-local reg_handler = nil ---@type fun( ctx: reg_handler_ctx): string[]
-local op_state = op_utils.get_new_op_state() --- @type op_state
+local op_state = nil --- @type OpState
 
 local before = false --- @type boolean
 local force_linewise = false --- @type boolean
@@ -43,20 +42,21 @@ local function paste_visual(opts)
     return "g@"
 end
 
+-- TODO: Another to add to the setup hooks
 local function should_reindent(ctx)
     ctx = ctx or {}
-
-    if ctx.on_blank or ctx.regtype == "V" or ctx.motion == "line" then
-        return true
-    else
-        return false
-    end
+    return ctx.on_blank or ctx.regtype == "V" or ctx.motion == "line"
 end
+
+-- TODO: Should be able to pass a nil reg_handler to get_new_op_state and have it work so long
+-- as op_type == "p"
+-- TODO: Document that any reg-handler input for paste will be ignored
 
 function M.setup(opts)
     opts = opts or {}
 
-    reg_handler = opts.reg_handler or reg_utils.get_handler()
+    local reg_handler = opts.reg_handler or reg_utils.get_handler()
+    op_state = op_utils.get_new_op_state(hl_group, hl_ns, hl_timeout, reg_handler, "p")
 
     vim.keymap.set("n", "<Plug>(SpecOpsPasteNormalAfterCursor)", function()
         return paste_norm()
@@ -83,30 +83,71 @@ function M.setup(opts)
     end, { expr = true, silent = true })
 end
 
+--- @param cur_op_state OpState
+--- Edit op_state in place
+--- Adjust marks for paste after cursor
+--- If you set text using row, col, row, col, the text is inserted before the col
+--- If you set lines using row, row, it will set on the row and push pre-existing text down
+--- In both cases, to paste after the end of a line or buffer boundary, the last 1 index is valid
+local function adjust_after(cur_op_state)
+    if not before then
+        return
+    end
+
+    assert(
+        cur_op_state.marks.start.row == cur_op_state.marks.fin.row,
+        "Norm paste rows do not match"
+    )
+    assert(
+        cur_op_state.marks.start.col == cur_op_state.marks.fin.col,
+        "Norm paste cols do not match"
+    )
+
+    if cur_op_state.motion == "line" then
+        cur_op_state.marks.start.row = cur_op_state.marks.start.row + 1
+
+        -- PERF: Should not be necessary since strict indexing is not used, but will keep here
+        -- for now
+        local line_count = vim.api.nvim_buf_get_line_count(0)
+        cur_op_state.marks.start.row = math.min(cur_op_state.marks.start.row, line_count)
+        cur_op_state.marks.fin.row = cur_op_state.marks.start.row
+
+        local row = cur_op_state.marks.start.row
+        local new_start = vim.api.nvim_buf_get_lines(0, row - 1, row, false)[1]
+        -- PERF: Not sure if this is necessary since we're setting lines
+        cur_op_state.marks.start.col = math.min(cur_op_state.marks.start.col, #new_start)
+        cur_op_state.marks.fin.col = cur_op_state.marks.start.col
+    else
+        local col = cur_op_state.marks.start.col --- @type integer
+        local start_line = cur_op_state.start_line_pre --- @type string
+
+        --- @type integer|nil, integer|nil, string|nil
+        local _, fin_byte, _ = blk_utils.byte_bounds_from_col(start_line, col)
+        assert(fin_byte) -- TODO: This is sloppy
+
+        cur_op_state.marks.start.col = fin_byte + 1
+        cur_op_state.marks.start.col = math.min(cur_op_state.marks.start.col, #start_line)
+        cur_op_state.marks.fin.col = cur_op_state.marks.start.col
+    end
+end
+
 --- @return nil
 M.paste_norm_callback = function(motion)
     op_utils.set_op_state_cb(op_state, motion)
-    local post = op_state.post
 
-    -- TODO: This is silly right now, but the validation logic will be removed from the state
-    -- update
-    local reges = reg_handler({ op = "p", reg = post.reg, vmode = post.vmode })
-    -- TODO: This technically works right now, but is a brittle assumption
-    local reg = reges[1]
-
-    local text = vim.fn.getreg(reg) --- @type string
-    if (not text) or text == "" then
-        return vim.notify(reg .. " register is empty", vim.log.levels.INFO)
+    reg_utils.get_reginfo(op_state)
+    if not reg_utils.can_set_reginfo(op_state) then
+        return
     end
 
-    local regtype = force_linewise and "V" or vim.fn.getregtype(reg) --- @type string
+    assert(#op_state.reginfo == 1) --- TODO: Dumb
+    op_state.reginfo[1].type = force_linewise and "V" or op_state.reginfo[1].type
+    op_utils.op_state_apply_count(op_state)
+    adjust_after(op_state)
+
     local cur_pos = vim.api.nvim_win_get_cursor(0) --- @type {[1]: integer, [2]:integer}
+    local on_blankline = op_state.start_line_pre:match("^%s*$") --- @type boolean
 
-    --- @type string
-    local start_line = vim.api.nvim_buf_get_lines(0, cur_pos[1] - 1, cur_pos[1], false)[1]
-    local on_blank = not start_line:match("%S") --- @type boolean
-
-    local vcount = vim.v.count1
     local marks, err = paste_utils.do_paste({
         regtype = regtype,
         cur_pos = cur_pos,
@@ -119,25 +160,13 @@ M.paste_norm_callback = function(motion)
         return "paste_norm: " .. (err or ("Unknown error in " .. regtype .. " paste"))
     end
 
-    if should_reindent({ on_blank = on_blank, regtype = regtype, motion = motion }) then
+    if should_reindent({ on_blank = on_blankline, regtype = regtype, motion = motion }) then
         marks = utils.fix_indents(marks, cur_pos)
     end
 
     paste_utils.adj_paste_cursor_default({ marks = marks, regtype = regtype })
-    cycle.ingest_state(
-        motion,
-        reg,
-        marks,
-        post.vmode,
-        -- text,
-        vim.api.nvim_get_current_buf(),
-        vim.api.nvim_get_current_win(),
-        before,
-        vcount,
-        --- @diagnostic disable: undefined-field
-        post.view.curswant
-    )
-    shared.highlight_text(marks, hl_group, hl_ns, hl_timer, regtype)
+
+    shared.highlight_text(marks, hl_group, hl_ns, hl_timeout, regtype)
 end
 
 --- @param text string
@@ -251,7 +280,7 @@ function M.paste_visual_callback(motion)
         post.view.curswant
     )
 
-    shared.highlight_text(post_marks, hl_group, hl_ns, hl_timer, regtype)
+    shared.highlight_text(post_marks, hl_group, hl_ns, hl_timeout, regtype)
 end
 
 return M
