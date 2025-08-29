@@ -2,6 +2,12 @@
 PROJECT WIDE
 ------------
 
+- Why have handlers passed around using the config at all? Just make them hackable by having
+them be M.functions. If you want to set a custom reg_handler you can... just do it. So you
+would still have a global setting if you wanted to make everything use ring, but if you wanted
+to set a custom handler, just do it directly. I guess an issue here is that right now they
+are hidden in op_state. So you could either just make a function to do it or make it exposed
+somehow. Having op_state repeatedly copy over the reg_handler value seems dumb
 - For config, the issue is the individual operators
 - Have a config option to set default keymaps that defaults to true. Document the plug maps.
 - How are yanking and pasting to the expression register handled by default? Emulate

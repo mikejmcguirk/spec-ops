@@ -1,3 +1,7 @@
+-- TODO: A useful visual mode mapping would be to yank the current selection and paste directly
+-- above or below it, so it would be I think [p ]p in visual mode. And you could apply a count
+-- to this as well. Useful for something like copying keymap bindings
+
 local blk_utils = require("spec-ops.block-utils")
 local cycle = require("spec-ops.cycle")
 local get_utils = require("spec-ops.get-utils")
